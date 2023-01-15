@@ -7,4 +7,23 @@ services:
       - ./app:/app
     ports:
       - 8501:8501
+  spark:
+    image: docker.io/bitnami/spark:3.3
+    environment:
+      - SPARK_MODE=master
+    volumes:
+      - ./data:/data
+      - ./jobs:/jobs
+  spark-worker:
+    image: docker.io/bitnami/spark:3.3
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark:7077
+      - SPARK_WORKER_MEMORY=4G
+      - SPARK_EXECUTOR_MEMORY=4G
+      - SPARK_WORKER_CORES=4
+    volumes:
+      - ./data:/data
+      - ./jobs:/jobs 
+
       
