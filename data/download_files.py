@@ -1,7 +1,7 @@
 import os
 
 URL = "http://servicosbhtrans.pbh.gov.br/Bhtrans/webservice/{}_{}.zip"
-MONTHS = ["JANEIRO", "FEVEREIRO", "MARÇO"]
+MONTHS = ["JANEIRO", "FEVEREIRO"]
 YEARS = [2022]
 
 
