@@ -1,0 +1,10 @@
+version: '3'
+services:
+  pystreamlit:
+    build:
+      context: .
+    volumes:
+      - ./app:/app
+    ports:
+      - 8501:8501
+      
