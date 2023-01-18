@@ -5,6 +5,7 @@ services:
       context: .
     volumes:
       - ./app:/app
+      - ./data:/data
     ports:
       - 8501:8501
   spark:

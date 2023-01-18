@@ -59,6 +59,6 @@ df = (
     df
     .write
     .mode("overwrite")
-    .partitionBy("MONTH", "CLASS", "MIN_TIME")
+    .partitionBy("MONTH", "CLASS")
     .parquet("/data/vehicles_count.parquet")
 )
