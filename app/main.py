@@ -7,6 +7,10 @@ import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 
+#import matplotlib Patch
+import matplotlib.pyplot as plt
+import matplotlib.patheffects as pe
+
 MIN_DATE = pd.to_datetime("2022-01-01")
 MAX_DATE = pd.to_datetime("2022-02-28")
 
@@ -62,7 +66,7 @@ def read_traffic_count_data(
     vehicle_classes_translate = {
         "BUS/TRUCK": "CAMINHAO_ONIBUS",
         "CAR": "AUTOMOVEL",
-        "MOTORCYCLE": "MOTOCICLETA",
+        "MOTORCYCLE": "MOTO",
         "UNDEFINED": "INDEFINIDO"
     }
 
@@ -110,13 +114,19 @@ def read_traffic_count_data(
     return df_traffic
 
 
-def read_map_data(df_traffic):
+def load_map_data():
     # read geojson
     path = './map/mg.json'
     gdf_bh = gpd.read_file(path)
 
     gdf_bh = gdf_bh.loc[gdf_bh["name"] == "Belo Horizonte"]
     gdf_bh = gdf_bh.to_crs(epsg=3857)
+
+    return gdf_bh
+
+
+def read_map_data(df_traffic):
+    gdf_bh = load_map_data()
 
     ax = gdf_bh.plot(
         color="orange",
@@ -125,13 +135,14 @@ def read_map_data(df_traffic):
         figsize=(10, 10)
     )
     ax.set_axis_off()
-    
+
     cx.add_basemap(
         ax,
         source=cx.providers.Stamen.TonerLite
     )
 
     return ax
+
 
 def plot_count_data(df_traffic, ax):
 
@@ -141,17 +152,27 @@ def plot_count_data(df_traffic, ax):
             df_traffic.LONGITUDE, df_traffic.LATITUDE
         )
     )
+    gdf_traffic = gdf_traffic.set_crs(epsg=4326).to_crs(epsg=3857)
 
-    gdf_traffic.plot(
+    gdf_traffic["MARKER_SIZE"] = gdf_traffic["COUNT"] / (1e4)
+
+    ax = gdf_traffic.plot(
         column="COUNT",
         legend=True,
-        markersize=1,
+        markersize="MARKER_SIZE",
         figsize=(10, 10),
+        zorder=2,
+        color="#fc4c4c",
+        alpha=0.8,
+        # add legend
+
         ax=ax
     )
 
-    return ax.figure
+    st.write(" Max marker size: ", gdf_traffic["MARKER_SIZE"].max())
+    st.write(" Min marker size: ", gdf_traffic["MARKER_SIZE"].min())
 
+    return ax.figure
 
 if __name__ == "__main__":
 
@@ -170,3 +191,16 @@ if __name__ == "__main__":
     ax = read_map_data(df_traffic)
     fig = plot_count_data(df_traffic, ax)
     st.pyplot(fig)
+
+    st.dataframe(df_traffic)
+
+    st.sidebar.markdown(
+        """
+        ## About
+
+        This app is a demo of a streamlit app that uses geopandas and
+        geoplot to plot data on a map.
+
+        The data used in this app is from the Brazilian government Open Data Portal.
+        """
+    )
