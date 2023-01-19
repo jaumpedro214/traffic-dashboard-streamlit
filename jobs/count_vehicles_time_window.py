@@ -43,7 +43,9 @@ df = (
             TIME_WINDOW
         )
         .alias("TIME_WINDOW"),
-        F.col("CLASS")
+        F.col("CLASS"),
+        F.col("LATITUDE"),
+        F.col("LONGITUDE"),
     )
     .agg(
         F.count("*").alias("COUNT"),
