@@ -7,9 +7,9 @@ import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 
-#import matplotlib Patch
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as pe
+import matplotlib.patches as mpatches
 
 MIN_DATE = pd.to_datetime("2022-01-01")
 MAX_DATE = pd.to_datetime("2022-02-28")
@@ -129,7 +129,7 @@ def read_map_data(df_traffic):
     gdf_bh = load_map_data()
 
     ax = gdf_bh.plot(
-        color="orange",
+        color="black",
         edgecolor="black",
         alpha=0.2,
         figsize=(10, 10)
@@ -164,15 +164,41 @@ def plot_count_data(df_traffic, ax):
         zorder=2,
         color="#fc4c4c",
         alpha=0.8,
-        # add legend
-
         ax=ax
     )
 
-    st.write(" Max marker size: ", gdf_traffic["MARKER_SIZE"].max())
-    st.write(" Min marker size: ", gdf_traffic["MARKER_SIZE"].min())
+    # add the count to each point
+    gdf_traffic_head = gdf_traffic.sort_values("COUNT", ascending=False).head(5)
+
+    # if x < 1e4 -> 8
+    # if x > 1e4 and x <= 1e6 -> 10
+    # if x >= 1e6 -> 12
+    fontsize_func = lambda x: 10 if x < 1e3 else 12 if x <= 1e6 else 14
+    # Use K and M to represent the number
+    text_number_represent = lambda x: f"{x/1e3:.1f}K" if x < 1e6 else f"{x/1e6:.1f}M"
+
+    for x, y, label in zip(
+        gdf_traffic_head.geometry.x,
+        gdf_traffic_head.geometry.y,
+        gdf_traffic_head["COUNT"]
+    ):
+        ax.annotate(
+            text_number_represent(label),
+            xy=(x, y),
+            xytext=(0, 2),
+            textcoords="offset points",
+            fontsize=fontsize_func(label),
+            color="white",
+            ha="center",
+            va="bottom",
+            # add outline to the text
+            path_effects=[
+                pe.withStroke(linewidth=0.5, foreground="black")
+            ]
+        )
 
     return ax.figure
+
 
 if __name__ == "__main__":
 
@@ -182,17 +208,17 @@ if __name__ == "__main__":
     min_date, max_date = dates_range()
     min_hour, max_hour = hour_range()
 
-    df_traffic = read_traffic_count_data(
+    df_traffic_geogrouped = read_traffic_count_data(
         min_date, max_date,
         min_hour, max_hour,
         vehicle_classes
     )
 
-    ax = read_map_data(df_traffic)
-    fig = plot_count_data(df_traffic, ax)
+    ax = read_map_data(df_traffic_geogrouped)
+    fig = plot_count_data(df_traffic_geogrouped, ax)
     st.pyplot(fig)
 
-    st.dataframe(df_traffic)
+    st.dataframe(df_traffic_geogrouped)
 
     st.sidebar.markdown(
         """
