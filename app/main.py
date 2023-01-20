@@ -83,6 +83,14 @@ def text_sidebar_about():
         """
     )
 
+    st.sidebar.markdown(
+        """
+        ## Caveats
+
+        1. As the data is collected from traffic radars, the data is not 100% accurate and is biased towards the main roads.
+        2. Because of 1, the numbers are probably way under the real numbers.
+        """
+    )
 
 
 ## Data ##
@@ -258,7 +266,7 @@ def plot_count_data(df_traffic, ax):
     return ax
 
 
-def plot_class_counts_data(df_traffic_classgrouped, vehicle_classes, ax):
+def plot_class_counts_data(df_traffic_classgrouped, vehicle_classes):
 
     emojis = {
         "MOTO": ":motor_scooter:",
@@ -266,13 +274,13 @@ def plot_class_counts_data(df_traffic_classgrouped, vehicle_classes, ax):
         "CAMINHAO_ONIBUS": ":truck:",
         "INDEFINIDO": ":question:"
     }
-    
+
     # Remove Undefined class
     if 'UNDEFINED' in vehicle_classes:
         vehicle_classes.remove("UNDEFINED")
 
     if len(vehicle_classes) == 0:
-        return 
+        return
 
     # Plot class grouped data
     class_columns = st.columns(len(vehicle_classes))
@@ -280,7 +288,7 @@ def plot_class_counts_data(df_traffic_classgrouped, vehicle_classes, ax):
     for i, vehicle_class in enumerate(vehicle_classes):
 
         vehicle_class_pt = VEHICLE_CLASSES_TRANSLATE[vehicle_class]
-        
+
         count = df_traffic_classgrouped.query(
             f"CLASS == '{vehicle_class_pt}'"
         )["COUNT"].values[0]
@@ -290,7 +298,8 @@ def plot_class_counts_data(df_traffic_classgrouped, vehicle_classes, ax):
 
         count_text = f"{count:,}".replace(",", " ")
 
-        class_columns[i].subheader(f"{emojis[vehicle_class_pt]} {vehicle_class}")
+        class_columns[i].subheader(
+            f"{emojis[vehicle_class_pt]} {vehicle_class}")
         class_columns[i].markdown(
             f"""
             #### {count_text} ({percentage:.1%}) 
@@ -301,7 +310,11 @@ def plot_class_counts_data(df_traffic_classgrouped, vehicle_classes, ax):
 if __name__ == "__main__":
 
     # App header
-    st.title("Traffic in Belo Horizonte - MG")
+    TITLE = "How, when and where people move in  the roads of Belo Horizonte?"
+    SUBTITLE = "Georeferenced and temporal analysis of traffic in the capital of Minas Gerais"
+
+    st.title(TITLE)
+    st.sidebar.markdown("## "+SUBTITLE)
     st.markdown("")
 
     # Adding widgets
@@ -328,15 +341,16 @@ if __name__ == "__main__":
 
     total_count = df_traffic_classgrouped["COUNT"].sum()
 
-    # Plot georeferenced data
+    # Title with total count
     st.header(
         f"{total_count:,} ".replace(',', ' ')
         + "vehicles detected"
     )
 
+    # Plot georeferenced data
     ax = read_map_data(df_traffic_geogrouped)
     ax = plot_count_data(df_traffic_geogrouped, ax)
     st.pyplot(ax.figure)
 
     # Plot class grouped data
-    plot_class_counts_data(df_traffic_classgrouped, vehicle_classes, ax)
+    plot_class_counts_data(df_traffic_classgrouped, vehicle_classes)
