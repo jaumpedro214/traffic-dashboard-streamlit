@@ -14,8 +14,18 @@ import matplotlib.patches as mpatches
 MIN_DATE = pd.to_datetime("2022-01-01")
 MAX_DATE = pd.to_datetime("2022-02-28")
 
+VEHICLE_CLASSES_TRANSLATE = {
+    "BUS/TRUCK": "CAMINHAO_ONIBUS",
+    "CAR": "AUTOMOVEL",
+    "MOTORCYCLE": "MOTO",
+    "UNDEFINED": "INDEFINIDO"
+}
 
-def dates_range():
+## Widgets ##
+## ======= ##
+
+
+def widget_dates_range():
     lateral_columns = st.sidebar.columns([1, 1])
     min_date = lateral_columns[0].date_input(
         "From", MIN_DATE,
@@ -31,7 +41,7 @@ def dates_range():
     return min_date, max_date
 
 
-def vehicle_class():
+def widget_vehicle_class():
     vehicle_type = st.sidebar.multiselect(
         "Vehicle Class",
         ["BUS/TRUCK", "CAR", "MOTORCYCLE", "UNDEFINED"],
@@ -41,7 +51,7 @@ def vehicle_class():
     return vehicle_type
 
 
-def hour_range():
+def widget_hour_range():
 
     # slider with the hour and minute
     columns = st.sidebar.columns([1, 20, 1])
@@ -59,19 +69,34 @@ def hour_range():
     return min_hour, max_hour
 
 
+def text_sidebar_about():
+    st.sidebar.markdown(
+        """
+        ## About
+
+        This app is a demo of a streamlit app that uses geopandas to plot data on a map.
+
+        The data used is from the [Brazilian Government Open Data Portal](https://dados.gov.br/dados/conjuntos-dados/contagens-volumetricas-de-radares), made availabye by the Belo Horizonte City Hall.
+        It contains the readings of the traffic radars in the city of Belo Horizonte, in the state of Minas Gerais.
+
+        _Author: [João Pedro](https://github.com/jaumpedro214)_
+        """
+    )
+
+
+
+## Data ##
+## ==== ##
+
+
+@st.cache
 def read_traffic_count_data(
     min_date, max_date, min_hour, max_hour, vehicle_classes
 ):
     # translate the vehicle classes
-    vehicle_classes_translate = {
-        "BUS/TRUCK": "CAMINHAO_ONIBUS",
-        "CAR": "AUTOMOVEL",
-        "MOTORCYCLE": "MOTO",
-        "UNDEFINED": "INDEFINIDO"
-    }
 
     vehicle_classes = [
-        vehicle_classes_translate[vehicle_class]
+        VEHICLE_CLASSES_TRANSLATE[vehicle_class]
         for vehicle_class in vehicle_classes
     ]
 
@@ -100,6 +125,12 @@ def read_traffic_count_data(
         "HOUR >= @min_hour.hour and HOUR <= @max_hour.hour"
     )
 
+    return df_traffic
+
+
+@st.cache
+def group_traffic_count_data(df_traffic):
+
     # group by LONGITUDE, LATITUDE
     df_traffic = (
         df_traffic
@@ -112,6 +143,30 @@ def read_traffic_count_data(
     df_traffic["LONGITUDE"] = df_traffic["LONGITUDE"].astype(float)
 
     return df_traffic
+
+
+@st.cache
+def group_traffic_count_data_by_class(df_traffic):
+
+    # group by CLASS
+    df_traffic = (
+        df_traffic
+        .groupby(["CLASS"])
+        .agg({
+            "COUNT": "sum"
+        })
+        .reset_index()
+    )
+
+    # Calculate percentage
+    df_traffic["PERCENTAGE"] = (
+        df_traffic["COUNT"] / df_traffic["COUNT"].sum()
+    )
+
+    return df_traffic
+
+## Plot ##
+## ==== ##
 
 
 def load_map_data():
@@ -168,14 +223,17 @@ def plot_count_data(df_traffic, ax):
     )
 
     # add the count to each point
-    gdf_traffic_head = gdf_traffic.sort_values("COUNT", ascending=False).head(5)
+    gdf_traffic_head = gdf_traffic.sort_values(
+        "COUNT", ascending=False).head(5)
 
     # if x < 1e4 -> 8
     # if x > 1e4 and x <= 1e6 -> 10
     # if x >= 1e6 -> 12
-    fontsize_func = lambda x: 10 if x < 1e3 else 12 if x <= 1e6 else 14
+    def fontsize_func(x): return 10 if x < 1e3 else 12 if x <= 1e6 else 14
     # Use K and M to represent the number
-    text_number_represent = lambda x: f"{x/1e3:.1f}K" if x < 1e6 else f"{x/1e6:.1f}M"
+
+    def text_number_represent(
+        x): return f"{x/1e3:.1f}K" if x < 1e6 else f"{x/1e6:.1f}M"
 
     for x, y, label in zip(
         gdf_traffic_head.geometry.x,
@@ -197,36 +255,88 @@ def plot_count_data(df_traffic, ax):
             ]
         )
 
-    return ax.figure
+    return ax
+
+
+def plot_class_counts_data(df_traffic_classgrouped, vehicle_classes, ax):
+
+    emojis = {
+        "MOTO": ":motor_scooter:",
+        "AUTOMOVEL": ":red_car:",
+        "CAMINHAO_ONIBUS": ":truck:",
+        "INDEFINIDO": ":question:"
+    }
+    
+    # Remove Undefined class
+    if 'UNDEFINED' in vehicle_classes:
+        vehicle_classes.remove("UNDEFINED")
+
+    if len(vehicle_classes) == 0:
+        return 
+
+    # Plot class grouped data
+    class_columns = st.columns(len(vehicle_classes))
+
+    for i, vehicle_class in enumerate(vehicle_classes):
+
+        vehicle_class_pt = VEHICLE_CLASSES_TRANSLATE[vehicle_class]
+        
+        count = df_traffic_classgrouped.query(
+            f"CLASS == '{vehicle_class_pt}'"
+        )["COUNT"].values[0]
+        percentage = df_traffic_classgrouped.query(
+            f"CLASS == '{vehicle_class_pt}'"
+        )["PERCENTAGE"].values[0]
+
+        count_text = f"{count:,}".replace(",", " ")
+
+        class_columns[i].subheader(f"{emojis[vehicle_class_pt]} {vehicle_class}")
+        class_columns[i].markdown(
+            f"""
+            #### {count_text} ({percentage:.1%}) 
+            """
+        )
 
 
 if __name__ == "__main__":
 
+    # App header
     st.title("Traffic in Belo Horizonte - MG")
+    st.markdown("")
 
-    vehicle_classes = vehicle_class()
-    min_date, max_date = dates_range()
-    min_hour, max_hour = hour_range()
+    # Adding widgets
+    # on the sidebar
 
-    df_traffic_geogrouped = read_traffic_count_data(
+    vehicle_classes = widget_vehicle_class()
+    min_date, max_date = widget_dates_range()
+    min_hour, max_hour = widget_hour_range()
+    text_sidebar_about()
+
+    if len(vehicle_classes) == 0:
+        st.stop()
+
+    # Main app
+    # Read data
+    df_traffic = read_traffic_count_data(
         min_date, max_date,
         min_hour, max_hour,
         vehicle_classes
+    ).copy()
+    df_traffic_geogrouped = group_traffic_count_data(df_traffic).copy()
+    df_traffic_classgrouped = group_traffic_count_data_by_class(
+        df_traffic).copy()
+
+    total_count = df_traffic_classgrouped["COUNT"].sum()
+
+    # Plot georeferenced data
+    st.header(
+        f"{total_count:,} ".replace(',', ' ')
+        + "vehicles detected"
     )
 
     ax = read_map_data(df_traffic_geogrouped)
-    fig = plot_count_data(df_traffic_geogrouped, ax)
-    st.pyplot(fig)
+    ax = plot_count_data(df_traffic_geogrouped, ax)
+    st.pyplot(ax.figure)
 
-    st.dataframe(df_traffic_geogrouped)
-
-    st.sidebar.markdown(
-        """
-        ## About
-
-        This app is a demo of a streamlit app that uses geopandas and
-        geoplot to plot data on a map.
-
-        The data used in this app is from the Brazilian government Open Data Portal.
-        """
-    )
+    # Plot class grouped data
+    plot_class_counts_data(df_traffic_classgrouped, vehicle_classes, ax)
